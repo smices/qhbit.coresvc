@@ -1,9 +1,15 @@
 #pragma once
 
-
+//================================================
 #include <string>
+#include <iostream>
 #include <fstream>
+#include <sstream>
 #include <iomanip>
+#include <map>
+#include <algorithm>
+//#include <locale>
+//================================================
 
 #include <tchar.h>
 #include <direct.h>
@@ -12,5 +18,7 @@
 #include <Windows.h>
 #include <Shlwapi.h>
 #pragma comment(lib,"shlwapi.lib") 
-
+#include <Wincrypt.h>
+#pragma comment(lib,"Advapi32.lib")
 #include <SDKDDKVer.h>
+//#include <strsafe.h>

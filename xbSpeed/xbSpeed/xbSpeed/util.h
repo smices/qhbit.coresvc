@@ -1,7 +1,14 @@
 
 #pragma once
 #include "global.h"
+#include "xldl.h"
+#include "DownWrapper.h"
+
 #include "xbStructDef.h"
+
+extern DownWrapper* g_pWapper;
+
+void PrintTaskInfo(DownTaskInfo &info,bool bTitle=false);
 
 BOOL StringToWString(const std::string &str,std::wstring &wstr);
 BOOL WStringToString(const std::wstring &wstr,std::string &str);
@@ -29,7 +36,10 @@ typedef struct _tagThreadCtrl {
 	WORD  m_wStatus;
 }ThreadCtrl,*PThreadCtrl;
 
-
+int GlobalInitialize(CurlInitialize &curl);
+DownWrapper* LoadDll();
+void UnloadDll(DownWrapper** Wapper);
+//----------------------------------------------
 DWORD WINAPI CommonThreadProc(LPVOID);
 PThreadCtrl CreateXbThread(PVOID,DWORD (*ThreadProc)(PThreadCtrl));
 BOOL ResumeXbThread(PThreadCtrl);
@@ -40,3 +50,8 @@ DWORD UpdateThreadProc(PThreadCtrl);
 DWORD TaskThreadProc(PThreadCtrl);
 //==========================================
 int ScanLogicalDrive(char **disk);
+
+int CompressBySnappy(std::string szSource,std::string szDestination);
+int UncompressBySnappy(std::string szSource,std::string szDestination);
+
+std::string AlgorithemMD5(std::string szFile);

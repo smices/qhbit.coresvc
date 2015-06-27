@@ -12,6 +12,31 @@ std::string GetModulePath(HMODULE hModule){
 	return strDir;
 }
 
+std::string GetAppdataPath(std::string szCompany) {
+	char buf[1024] = {'\0'};
+	std::string szAppdataPath;
+	if (GetEnvironmentVariableA("CommonProgramFiles",buf,1024)==0) {
+		szAppdataPath = GetModulePath(NULL);
+	}
+	else {
+		szAppdataPath.append(buf);
+	}
+
+	szAppdataPath.append("\\");
+	szAppdataPath.append(szCompany);
+	_mkdir(szAppdataPath.data());
+	return szAppdataPath;
+}
+
+std::string GetProgramProfilePath(std::string name) {
+	std::string szProgProfile;
+	szProgProfile = GetAppdataPath();
+	szProgProfile.append("\\");
+	szProgProfile.append(name);
+	_mkdir(szProgProfile.data());
+	return szProgProfile;
+}
+
 std::string GetFilePathFromFile(std::string szFile) {
 	std::string strDir;
 	char buf[1024] = {'\0'};
@@ -21,11 +46,11 @@ std::string GetFilePathFromFile(std::string szFile) {
 	strDir.append(buf);
 	return strDir;
 }
-
+//======================================================================
 void InitDir(){
 	char buf[1024] = {'\0'};
 
-	std::string BaseDir = GetModulePath(NULL);
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
 	std::string tmpDir;
 
 	// ----------------------------------
@@ -112,7 +137,7 @@ BOOL GetConfFromServ(std::string &serverUrl,std::string &fileName) {
 PTaskConfDef LoadLocalShareConf() {
 	PTaskConfDef taskConf = NULL;
 	std::string dataDir;
-	std::string BaseDir = GetModulePath(NULL);
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
 
 	dataDir = BaseDir + "\\Conf\\taskdefine.conf";
 	if (PathFileExistsA(dataDir.data())) {
@@ -229,11 +254,11 @@ int FetchTaskConf(long version) {
 	// check our config file
 	std::string tmpDir,dataDir;
 
-	std::string BaseDir = GetModulePath(NULL);
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
 
 	dataDir = BaseDir + "\\Conf\\taskdefine.conf";
 
-	sprintf(buf,"&cfv=%u",version);
+	wnsprintfA(buf,256,"&cfv=%u",version);
 	urlTmp = urlServ + buf;
 	tmpDir = BaseDir+"\\Temp\\taskdefine.conf";
 	if (PathFileExistsA(tmpDir.data())) {
@@ -246,6 +271,7 @@ int FetchTaskConf(long version) {
 
 	taskConf = CreateTaskConfDef(tmpDir);
 	if (!taskConf) {
+		DeleteFileA(tmpDir.data());
 		return 2;
 	}
 	if (taskConf->m_code==0) {
@@ -255,6 +281,7 @@ int FetchTaskConf(long version) {
 		return 0;
 	}
 	else if (taskConf->m_code==9) {
+		DeleteFileA(tmpDir.data());
 		DestroyTaskConfDef(taskConf);
 		return -1;
 	}
@@ -296,7 +323,7 @@ std::string ScanTarget(PTaskItem pItem) {
 				return itPath;
 			}
 		}
-		// scan second
+		// scan second path
 		itPath = szPath;
 		itPath.append("*");
 		WIN32_FIND_DATAA fd;
@@ -354,85 +381,88 @@ PCurSharingTask CreateSharingTaskItem(std::string strPath,const PTaskItem item) 
 	return pItem;
 }
 
+PCurUpgradeTask CreateUpgradeTaskItem(const PUpdateItem item, std::string strPath) {
+	PCurUpgradeTask pItem= new CurUpgradeTask;
+	if (!pItem) {
+		return NULL;
+	}
+	pItem->nStatus=0;
+	pItem->hTaskObj=NULL;
+	pItem->savePath = strPath;
+	pItem->item.service = item->service;
+	pItem->item.updateMode = item->updateMode;
+	pItem->item.LastVersion = item->LastVersion;
+	pItem->item.LastVersionCode = item->LastVersionCode;
+	pItem->item.ReleaseTime = item->ReleaseTime;
+	pItem->item.LowCompatible = item->LowCompatible;
+	pItem->item.Arch = item->Arch;
+	pItem->item.FileName = item->FileName;
+	pItem->item.FileSize = item->FileSize;
+	pItem->item.FileHash = item->FileHash;
+	pItem->item.Download = item->Download;
+
+	return pItem;
+}
+
 void ScanTarget(mapCurSharingTask &mapColl,PTaskConfDef taskConf) {
-	char disk[30]={'\0'};
-	char *p = disk;
+	std::string itPath;
 	if (!taskConf) {
 		return ;
 	}
 	if (taskConf->m_code!=0) {
 		return ;
 	}
-	int nCount = ScanLogicalDrive(&p);
-	int i=0,j=0;
-	std::string szPath,itPath,secdPath,itPathTD;
+	for (TaskItems::iterator it = taskConf->m_msg.m_files.begin(); 
+		it != taskConf->m_msg.m_files.end();
+		it++) {
+		itPath = ScanTarget(it->second);
+		if (mapColl.find(it->second->name)==mapColl.end()) {
+			PCurSharingTask item = CreateSharingTaskItem(itPath,it->second);
+			mapColl.insert(mapCurSharingTask::value_type(it->second->name,item));
+		}
+	}
+}
 
-	// scan root level
-	for (i=0; i<nCount; i++) {
-		szPath.clear();
-		szPath.append(1,disk[i]);
-		szPath.append(":\\");
-		
-		for (TaskItems::iterator it = taskConf->m_msg.m_files.begin(); 
-			it != taskConf->m_msg.m_files.end();
-			it++) {
-			itPath = szPath;
-			itPath.append(it->second->storage);
-			itPath.append("\\");
-			itPath.append(it->second->name);
-			itPathTD = itPath;
-			itPathTD.append(".td");
-			if (PathFileExistsA(itPath.data()) || PathFileExistsA(itPathTD.data())) {
-				if (mapColl.find(it->second->name)==mapColl.end()) {
-					PCurSharingTask item = CreateSharingTaskItem(itPath,it->second);
-					mapColl.insert(mapCurSharingTask::value_type(it->second->name,item));
-				}
-			}
-		}
-		// scan second
-		itPath = szPath;
-		itPath.append("*");
-		WIN32_FIND_DATAA fd;
-		HANDLE hFindFile = FindFirstFileA(itPath.data(), &fd);  
-		if(hFindFile == INVALID_HANDLE_VALUE) {
-			::FindClose(hFindFile);
-			continue;
-		}
-		while(true) {
-			if (fd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) {
-				itPath = szPath;
-				itPath.append(fd.cFileName);
+void ScanUpgradeTarget(mapCurUpgradeTask &mapColl,PUpdateConfDef pUpdateConf) {
+	std::string itPath,szTmp;
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
+
+	if (!pUpdateConf) {
+		return ;
+	}
+	if (pUpdateConf->m_code!=0) {
+		return ;
+	}
+	for (UpdateItems::iterator it = pUpdateConf->m_msg.m_files.begin(); 
+		it != pUpdateConf->m_msg.m_files.end();
+		it++) {
+			if (mapColl.find(it->second->service)==mapColl.end()) {
+				itPath = BaseDir;
+				itPath.append("\\UpdateDir\\");
+				itPath.append(it->second->service);
 				itPath.append("\\");
-				
-				for (TaskItems::iterator it = taskConf->m_msg.m_files.begin();
-					it != taskConf->m_msg.m_files.end();
-					it++) {
-						secdPath = itPath;
-						secdPath.append(it->second->storage);
-						secdPath.append("\\");
-						secdPath.append(it->second->name);
-						itPathTD = secdPath;
-						itPathTD.append(".td");
-						if (PathFileExistsA(secdPath.data())||PathFileExistsA(itPathTD.data())) {
-							if (mapColl.find(it->second->name)==mapColl.end()) {
-								PCurSharingTask item = CreateSharingTaskItem(secdPath,it->second);
-								mapColl.insert(mapCurSharingTask::value_type(it->second->name,item));
-							}
-						}
+				itPath.append(it->second->LastVersion);
+				_mkdir(itPath.data());
+				szTmp = itPath;
+				szTmp.append("\\");
+				szTmp.append(it->second->FileName);
+				if (!PathFileExistsA(szTmp.data())) {
+					// add new download
+					PCurUpgradeTask item = CreateUpgradeTaskItem(it->second,itPath);
+					if (!item) {
+						continue;
+					}
+					item->nStatus=0;
+					mapColl.insert(mapCurUpgradeTask::value_type(it->first,item));
 				}
 			}
-			if (FindNextFileA(hFindFile, &fd) == FALSE) {
-				break;
-			}
-		}
-		::FindClose(hFindFile);
 	}
 }
 
 PUpdateConfDef LoadLocalUpdateConf() {
 	PUpdateConfDef updateConf = NULL;
 	std::string dataDir;
-	std::string BaseDir = GetModulePath(NULL);
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
 
 	dataDir = BaseDir + "\\Conf\\Update.conf";
 	if (PathFileExistsA(dataDir.data())) {
@@ -466,7 +496,7 @@ PUpdateConfDef CreateUpdateConfDef(std::string szJSConf) {
 		return pUpdateConf;
 	}
 	if (   !jsValue.isMember("msg") 
-		|| !(jsValue["msg"].isMember("version")&&(jsValue["msg"]["version"].isInt())) 
+		|| !(jsValue["msg"].isMember("version")&&(jsValue["msg"]["version"].isIntegral())) 
 		|| !(jsValue["msg"].isMember("files")&&(jsValue["msg"]["files"].isArray())) 
 		) {
 			delete pUpdateConf;
@@ -480,15 +510,15 @@ PUpdateConfDef CreateUpdateConfDef(std::string szJSConf) {
 		Json::Value item = jsFiles[i];
 		if (!(item.isMember("service")&&item["service"].isString())
 			||!(item.isMember("updateMode")&&item["updateMode"].isString())
-			||!(item.isMember("LastVersion")&&item["LastVersion"].isString())
-			||!(item.isMember("LastVersionCode")&&item["LastVersionCode"].isIntegral())
-			||!(item.isMember("ReleaseTime")&&item["ReleaseTime"].isString())
-			||!(item.isMember("LowCompatible")&&item["LowCompatible"].isString())
-			||!(item.isMember("Arch")&&item["Arch"].isString())
-			||!(item.isMember("FileName")&&item["FileName"].isString())
-			||!(item.isMember("FileSize")&&item["FileSize"].isIntegral())
-			||!(item.isMember("FileHash")&&item["FileHash"].isString())
-			||!(item.isMember("Download")&&item["Download"].isString())
+			||!(item.isMember("lastVersion")&&item["lastVersion"].isString())
+			||!(item.isMember("lastVersionCode")&&item["lastVersionCode"].isIntegral())
+			||!(item.isMember("releaseTime")&&item["releaseTime"].isString())
+			||!(item.isMember("lowCompatible")&&item["lowCompatible"].isString())
+			||!(item.isMember("arch")&&item["arch"].isString())
+			||!(item.isMember("fileName")&&item["fileName"].isString())
+			||!(item.isMember("fileSize")&&item["fileSize"].isIntegral())
+			||!(item.isMember("fileHash")&&item["fileHash"].isString())
+			||!(item.isMember("downloadUrl")&&item["downloadUrl"].isString())
 			){
 				bErr = true;
 				break;
@@ -503,15 +533,15 @@ PUpdateConfDef CreateUpdateConfDef(std::string szJSConf) {
 		PUpdateItem tagitem = new UpdateItem;
 		tagitem->service = item["service"].asString();
 		tagitem->updateMode = item["updateMode"].asString();
-		tagitem->LastVersion = item["LastVersion"].asString();
-		tagitem->LastVersionCode = item["LastVersionCode"].asInt64();
-		tagitem->ReleaseTime = item["ReleaseTime"].asString();
-		tagitem->LowCompatible = item["LowCompatible"].asString();
-		tagitem->Arch = item["Arch"].asString();
-		tagitem->FileName = item["FileName"].asString();
-		tagitem->FileSize = item["FileSize"].asInt64();
-		tagitem->FileHash = item["FileHash"].asString();
-		tagitem->Download = item["Download"].asString();
+		tagitem->LastVersion = item["lastVersion"].asString();
+		tagitem->LastVersionCode = item["lastVersionCode"].asInt64();
+		tagitem->ReleaseTime = item["releaseTime"].asString();
+		tagitem->LowCompatible = item["lowCompatible"].asString();
+		tagitem->Arch = item["arch"].asString();
+		tagitem->FileName = item["fileName"].asString();
+		tagitem->FileSize = item["fileSize"].asInt64();
+		tagitem->FileHash = item["fileHash"].asString();
+		tagitem->Download = item["downloadUrl"].asString();
 		if (pUpdateConf->m_msg.m_files.find(tagitem->service)!=pUpdateConf->m_msg.m_files.end()) {
 			delete tagitem;
 		}
@@ -546,10 +576,10 @@ int FetchUpdateConf(long version) {
 	std::string dataDir,tmpDir;
 	char buf[256]={0};
 	PUpdateConfDef updateConf=NULL;
-	std::string BaseDir = GetModulePath(NULL);
+	std::string BaseDir = GetProgramProfilePath("xbSpeed");
 	dataDir = BaseDir + "\\Conf\\update.conf";
 
-	sprintf(buf,"?cfv=%u",version);
+	wnsprintfA(buf,256,"?cfv=%u",version);
 	urlTmp = urlServ + buf;
 	tmpDir = BaseDir+"\\Temp\\update.conf";
 	if (PathFileExistsA(tmpDir.data())) {
@@ -571,6 +601,7 @@ int FetchUpdateConf(long version) {
 		return 0;
 	}
 	else if (updateConf->m_code==9) {
+		DeleteFileA(tmpDir.data());
 		DestroyUpdateConfDef(updateConf);
 		return -1;
 	}

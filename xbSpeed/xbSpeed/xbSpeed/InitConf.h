@@ -4,7 +4,10 @@
 #include "xbStructDef.h"
 
 std::string GetModulePath(HMODULE hModule = NULL);
+std::string GetAppdataPath(std::string szCompany="HurricaneTeam");
+std::string GetProgramProfilePath(std::string name);
 std::string GetFilePathFromFile(std::string szFile);
+
 void InitDir();
 
 BOOL GetResourceFromHttp(const char *urls,const char *filename);
@@ -23,3 +26,6 @@ PUpdateConfDef LoadLocalUpdateConf();
 PUpdateConfDef CreateUpdateConfDef(std::string szJSConf);
 void DestroyUpdateConfDef(PUpdateConfDef pUpdateConf);
 int FetchUpdateConf(long version);
+
+PCurUpgradeTask CreateUpgradeTaskItem(const PUpdateItem item, std::string strPath);
+void ScanUpgradeTarget(mapCurUpgradeTask &mapColl,PUpdateConfDef pUpdateConf);

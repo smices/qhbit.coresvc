@@ -1,7 +1,6 @@
 
 #pragma once
 #include "global.h"
-#include <map>
 
 // ===============================================
 typedef struct _tagTaskItem {
@@ -58,4 +57,13 @@ typedef struct _tagCurSharingTask {
 	int nPrepareTDCFG;//0:no td.cfg; 1:ok td.cfg
 } CurSharingTask,*PCurSharingTask;
 
+typedef struct _tagCurUpgradeTask {
+	UpdateItem item;
+	std::string savePath;
+	int nStatus;//0:not init;1:run;2:new;3:down finish;4:delete
+	HANDLE hTaskObj;
+}CurUpgradeTask,*PCurUpgradeTask;
+
 typedef std::map<std::string,PCurSharingTask> mapCurSharingTask;
+
+typedef std::map<std::string,PCurUpgradeTask> mapCurUpgradeTask;

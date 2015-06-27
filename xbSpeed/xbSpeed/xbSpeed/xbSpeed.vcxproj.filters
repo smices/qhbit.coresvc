@@ -28,6 +28,9 @@
     <Filter Include="curl\vtls">
       <UniqueIdentifier>{14556cc7-6510-4299-8217-00cf492bbe64}</UniqueIdentifier>
     </Filter>
+    <Filter Include="snappy">
+      <UniqueIdentifier>{a111e2a9-ca61-4fe2-a749-96c36a5b5fb6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="xbSpeed.cpp">
@@ -391,6 +394,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="xbBussinessImp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="snappy\snappy.cc">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="snappy\snappy-sinksource.cc">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="snappy\snappy-stubs-internal.cc">
+      <Filter>snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="svcImp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -830,6 +845,27 @@
     <ClInclude Include="xbBusinessImp.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="snappy\snappy.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="snappy\snappy-internal.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="snappy\snappy-sinksource.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="snappy\snappy-stubs-internal.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="snappy\snappy-stubs-public.h">
+      <Filter>snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="svcImp.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="json\json_internalarray.inl">
@@ -856,5 +892,11 @@
     <None Include="curl\include\curl\Makefile.in">
       <Filter>curl\include</Filter>
     </None>
+    <None Include="drv\ProcessProtect.sys" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="xbSpeed.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
