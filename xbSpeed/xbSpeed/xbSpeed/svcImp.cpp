@@ -458,7 +458,7 @@ bool InstallService(std::string servName,std::string servDisplayName,DWORD servT
 		}
 		// set depended
 		if (servType==SERVICE_KERNEL_DRIVER) {
-			HKEY hItem,hSubItem,hSubEnum;
+			HKEY hItem,hSubItem;
 			DWORD dwDisposition=0;
 			LONG code = RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services",0,KEY_CREATE_SUB_KEY,&hItem);
 			if (code == ERROR_SUCCESS) {
@@ -949,7 +949,14 @@ DWORD WINAPI xbSvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lpEvent
 VOID SvcInit( PSrvInfo pSrvInfo) {
 	BOOL bMainLoop  = TRUE;
 	DWORD dwWaitRetCode = WAIT_FAILED ;
+	DWORD dwFilter = REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_ATTRIBUTES | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_SECURITY;
+	std::string szServiceName;
+	std::string szLoadPath;
+
 	CurlInitialize curl;
+
+	WStringToString(_ServeName,szServiceName);
+
 	if (GlobalInitialize(curl)!=0) {
 		ReportSvcStatus(pSrvInfo, SERVICE_STOPPED, NO_ERROR, 0 );
 		return ;
@@ -980,23 +987,20 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 
 	pSrvInfo->vecCtrlEventHandle[cmdInstallStop] = CreateEventW(&securityAttr,FALSE,FALSE,wszEvtName.data());
 	pSrvInfo->cntCtrlEventHandle++;
+	pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange] = CreateEvent(NULL, FALSE, FALSE, NULL);
+	pSrvInfo->cntCtrlEventHandle++;
+	pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange] = CreateEvent(NULL, FALSE, FALSE, NULL);
+	pSrvInfo->cntCtrlEventHandle++;
+	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
+	RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
+	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
+	RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
 
 	ReportSvcStatus(pSrvInfo, SERVICE_RUNNING, NO_ERROR, 0 );
 	while(1) {
 		// Check whether to stop the service.
 		dwWaitRetCode = WaitForMultipleObjects(pSrvInfo->cntCtrlEventHandle,pSrvInfo->vecCtrlEventHandle,FALSE, 1000); //1s
 		if (dwWaitRetCode==WAIT_FAILED ||dwWaitRetCode==WAIT_TIMEOUT) {
-			std::string szServiceName;
-			std::string szLoadPath;
-
-			WStringToString(_ServeName,szServiceName);
-			szLoadPath = GetAppdataPath("HurricaneTeam"); // Run Install
-			szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
-			CheckXBSpeedRegConfig(szServiceName,szServiceName,"LocalSystem",szLoadPath,SERVICE_ERROR_IGNORE,SERVICE_AUTO_START,SERVICE_WIN32_OWN_PROCESS);
-			if (!PathFileExistsA(szPath.data())) {
-				extractProtectSys();
-//				extractDrv();
-			}
 			continue;
 		}
 		else {
@@ -1024,12 +1028,39 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 					DestoryXbThread(pShardTaskThrdCtrl);
 					pSrvInfo->vecCtrlEventHandle[cmdShareStopped] = pShardTaskThrdCtrl->m_hThread;
 				}
+				break;
+			case cmdXbSpeedRegChange:
+				SvcReportEvent(L"XbSpeed service config changed.");
+				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
+
+				szLoadPath = GetAppdataPath("HurricaneTeam");
+				szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
+				CheckXBSpeedRegConfig(szServiceName,szServiceName,"LocalSystem",szLoadPath,SERVICE_ERROR_IGNORE,SERVICE_AUTO_START,SERVICE_WIN32_OWN_PROCESS);
+				if (!PathFileExistsA(szPath.data())) {
+					extractProtectSys();
+					//				extractDrv();
+				}
+				break;
+			case cmdProtectRegChange:
+				SvcReportEvent(L"Process Protected service config changed.");
+				RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
+				break;
 			default:
 				break;
 			}
 		}
 	}
-//	if (hFileDrvSys!=INVALID_HANDLE_VALUE) CloseHandle(hFileDrvSys);
+	// Uninitialize handle
+	if (pSrvInfo)
+	{
+		for( int i=0; i<pSrvInfo->cntCtrlEventHandle; i++) {
+			if (pSrvInfo->vecCtrlEventHandle[i]!=INVALID_HANDLE_VALUE) CloseHandle(pSrvInfo->vecCtrlEventHandle[i]);
+		}
+		pSrvInfo->cntCtrlEventHandle=0;
+		if (pSrvInfo->hkXBSpeed) RegCloseKey(pSrvInfo->hkXBSpeed);
+		if (pSrvInfo->hkProcessProtect) RegCloseKey(pSrvInfo->hkProcessProtect);
+//		if (pSrvInfo->svcStatusHandle) ;
+	}
 }
 
 VOID WINAPI xbServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {

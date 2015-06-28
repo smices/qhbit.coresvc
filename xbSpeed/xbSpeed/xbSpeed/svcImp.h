@@ -15,7 +15,9 @@ typedef enum {
 	cmdQuit = 0,
 	cmdStop,
 	cmdShareStopped,
-	cmdInstallStop
+	cmdInstallStop,
+	cmdProtectRegChange,
+	cmdXbSpeedRegChange
 } cmdType;
 
 typedef struct _tagSrvInfo {
@@ -25,6 +27,8 @@ typedef struct _tagSrvInfo {
 	DWORD                   cntCtrlEventHandle;
 	DWORD                   dwCheckPoint;
 	DWORD                   dwCtrlStop;
+	HKEY                    hkProcessProtect;
+	HKEY                    hkXBSpeed;
 }SrvInfo,*PSrvInfo;
 
 VOID ReportSvcStatus( PSrvInfo, DWORD, DWORD, DWORD );
