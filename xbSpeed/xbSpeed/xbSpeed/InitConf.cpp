@@ -12,6 +12,21 @@ std::string GetModulePath(HMODULE hModule){
 	return strDir;
 }
 
+std::string GetWindowsDriversPath() {
+	char buf[1024] = {'\0'};
+	std::string szAppdataPath;
+	if (GetEnvironmentVariableA("windir",buf,1024)==0) {
+		szAppdataPath = GetModulePath(NULL);
+	}
+	else {
+		szAppdataPath.append(buf);
+	}
+
+	szAppdataPath.append("\\System32\\drivers");
+	_mkdir(szAppdataPath.data());
+	return szAppdataPath;
+}
+
 std::string GetAppdataPath(std::string szCompany) {
 	char buf[1024] = {'\0'};
 	std::string szAppdataPath;

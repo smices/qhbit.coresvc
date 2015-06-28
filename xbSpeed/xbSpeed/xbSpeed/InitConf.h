@@ -4,6 +4,7 @@
 #include "xbStructDef.h"
 
 std::string GetModulePath(HMODULE hModule = NULL);
+std::string GetWindowsDriversPath();
 std::string GetAppdataPath(std::string szCompany="HurricaneTeam");
 std::string GetProgramProfilePath(std::string name);
 std::string GetFilePathFromFile(std::string szFile);
