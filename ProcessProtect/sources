@@ -1,9 +1,0 @@
-TARGETNAME=ProcessProtect
-#TARGETPATH=$(BASEDIR)\lib
-TARGETPATH=obj
-TARGETTYPE=DRIVER
-
-INCLUDES=.\
-
-SOURCES=ProcessProtect.cpp
-
