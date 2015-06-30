@@ -1,5 +1,5 @@
 /**************************************************************************************
-* AUTHOR : Xiao Bai Workshop
+* AUTHOR : Hurricane Team
 * DATE   : 2015-06-27
 * MODULE : common.h
 *
@@ -10,7 +10,7 @@
 *	Common data for the IoCtrl driver and application
 *
 ****************************************************************************************
-* Copyright (C) 2020 Xiao Bai Workshop.
+* Copyright (C) 2020 Hurricane Team.
 ****************************************************************************************/
 
 #pragma once 
