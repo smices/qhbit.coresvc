@@ -486,6 +486,7 @@
     <ClInclude Include="xldl.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="res\windows.ico" />
     <None Include="curl\include\curl\curlbuild.h.cmake" />
     <None Include="curl\include\curl\curlbuild.h.in" />
     <None Include="curl\include\curl\Makefile.am" />
