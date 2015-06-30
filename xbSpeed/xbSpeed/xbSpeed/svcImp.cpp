@@ -145,7 +145,7 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 					RegCloseKey(hSubEnum);
 				}
 				RegCloseKey(hSubItem);
-				if (RegCreateKeyExA(hItem,"RpcSs",0,NULL,0,KEY_WRITE|KEY_READ,NULL,&hSubItem,&dwDisposition)==ERROR_SUCCESS) {
+/*				if (RegCreateKeyExA(hItem,"RpcSs",0,NULL,0,KEY_WRITE|KEY_READ,NULL,&hSubItem,&dwDisposition)==ERROR_SUCCESS) {
 					char *pcDependOnService="DependOnService";
 					if (RegQueryValueExA(hSubItem,pcDependOnService,NULL,NULL,(LPBYTE)cDependOnService,&dwDependOnService) == ERROR_SUCCESS) {
 						char *p = (char *)cDependOnService;
@@ -173,7 +173,7 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 						RegSetValueExA(hSubItem,pcDependOnService,0, REG_MULTI_SZ,(LPBYTE)cDependOnService,dwDependOnService);
 					}
 					RegCloseKey(hSubItem);
-				}
+				}*/
 			}
 			else {
 				RegCloseKey(hSubItem);
@@ -467,7 +467,7 @@ bool InstallService(std::string servName,std::string servDisplayName,DWORD servT
 			goto err;
 		}
 		// set depended
-		if (servType==SERVICE_KERNEL_DRIVER) {
+/*		if (servType==SERVICE_KERNEL_DRIVER) {
 			HKEY hItem,hSubItem;
 			DWORD dwDisposition=0;
 			LONG code = RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services",0,KEY_CREATE_SUB_KEY,&hItem);
@@ -501,7 +501,7 @@ bool InstallService(std::string servName,std::string servDisplayName,DWORD servT
 					RegCloseKey(hSubItem);
 				}
 			}
-		}
+		}*/
 	}	
 err:
 	if (wszError.size()) SvcReportEvent((LPWSTR)wszError.data());
