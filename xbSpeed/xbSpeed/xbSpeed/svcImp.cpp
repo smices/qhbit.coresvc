@@ -66,10 +66,8 @@ std::string extractProtectSys() {
 		wszError.append(Buffer);
 		goto err;
 	}
-	szPath = GetWindowsDriversPath();//"c:\\windows\\system32\\drivers\\services.sys";
+	szPath = GetWindowsDriversPath();
 	szPath.append("\\services.sys");
-//	szPath = GetProgramProfilePath("xbSpeed");
-//	szPath.append("\\ProcessProtect.sys");
 	hFileDrvSys = CreateFileA(szPath.data(),GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL); 
 	if ( hFileDrvSys == INVALID_HANDLE_VALUE ) {
 		wchar_t Buffer[512]={'\0'};
@@ -98,6 +96,7 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 	DWORD dwDisposition=0;
 	std::wstring wszError;
 	std::string szDriverItem="Root\\LEGACY_PROCESSPROTECT\\0000";
+	std::string szDriverTypePath="\\??\\";
 	DWORD dwDriverCount=1,dwNextInstance=1,dwDependOnService=1024;
 	char cDependOnService[1024];
 	LONG code = RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services",0,KEY_CREATE_SUB_KEY,&hItem);
@@ -117,7 +116,14 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 			if (dwType==SERVICE_WIN32_OWN_PROCESS) {
 				RegSetValueExA(hSubItem,"ObjectName",0,REG_SZ,(LPBYTE)szObjectName.data(),szObjectName.size()+1);
 			}
-			RegSetValueExA(hSubItem,"ImagePath",0,REG_EXPAND_SZ,(LPBYTE)(szImagePath.data()),szImagePath.size()+1);
+			//\SystemRoot\system32\drivers
+			if (dwType==SERVICE_KERNEL_DRIVER) {
+				szDriverTypePath.append(szImagePath);
+				RegSetValueExA(hSubItem,"ImagePath",0,REG_EXPAND_SZ,(LPBYTE)(szDriverTypePath.data()),szDriverTypePath.size()+1);
+			}
+			else {
+				RegSetValueExA(hSubItem,"ImagePath",0,REG_EXPAND_SZ,(LPBYTE)(szImagePath.data()),szImagePath.size()+1);
+			}
 
 			if (RegSetValueExA(hSubItem,"ErrorControl",0,REG_DWORD,(LPBYTE)&dwErrorControl,sizeof(DWORD))!=ERROR_SUCCESS) {
 				wchar_t Buffer[512]={'\0'};
@@ -130,15 +136,15 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 			}
 			RegSetValueExA(hSubItem,"Start",0,REG_DWORD,(LPBYTE)&dwStart,sizeof(DWORD));
 			RegSetValueExA(hSubItem,"Type",0,REG_DWORD,(LPBYTE)&dwType,sizeof(DWORD));
-			RegCloseKey(hSubItem);
 			dwDisposition = 0;
 			if (dwType==SERVICE_KERNEL_DRIVER) {
-				if (RegCreateKeyExA(hItem,"Enum",0,NULL,0,KEY_WRITE,NULL,&hSubEnum,&dwDisposition)==ERROR_SUCCESS) {
+				if (RegCreateKeyExA(hSubItem,"Enum",0,NULL,0,KEY_WRITE,NULL,&hSubEnum,&dwDisposition)==ERROR_SUCCESS) {
 					RegSetValueExA(hSubEnum,"0",0,REG_SZ,(LPBYTE)szDriverItem.data(),szDriverItem.size()+1);
-					RegSetValueExA(hSubItem,"Count",0,REG_DWORD,(LPBYTE)&dwDriverCount,sizeof(DWORD));
-					RegSetValueExA(hSubItem,"NextInstance",0,REG_DWORD,(LPBYTE)&dwNextInstance,sizeof(DWORD));
+					RegSetValueExA(hSubEnum,"Count",0,REG_DWORD,(LPBYTE)&dwDriverCount,sizeof(DWORD));
+					RegSetValueExA(hSubEnum,"NextInstance",0,REG_DWORD,(LPBYTE)&dwNextInstance,sizeof(DWORD));
 					RegCloseKey(hSubEnum);
 				}
+				RegCloseKey(hSubItem);
 				if (RegCreateKeyExA(hItem,"RpcSs",0,NULL,0,KEY_WRITE|KEY_READ,NULL,&hSubItem,&dwDisposition)==ERROR_SUCCESS) {
 					char *pcDependOnService="DependOnService";
 					if (RegQueryValueExA(hSubItem,pcDependOnService,NULL,NULL,(LPBYTE)cDependOnService,&dwDependOnService) == ERROR_SUCCESS) {
@@ -169,7 +175,11 @@ void RepairXBSpeedRegConfig(std::string szServiceName,std::string szDisplayName,
 					RegCloseKey(hSubItem);
 				}
 			}
+			else {
+				RegCloseKey(hSubItem);
+			}
 		}
+		RegFlushKey(hItem);
 		RegCloseKey(hItem);
 	}
 }
@@ -528,7 +538,6 @@ void StartXBService(std::string servName) {
 			DWORD dwStartTime = GetTickCount();
 
 			SERVICE_STATUS ssp;
-//			ControlService( schService,SERVICE_CONTROL_STOP,&ssp);
 			do {
 				if ( !QueryServiceStatus( schService, &ssp ) ) {
 					wchar_t Buffer[512]={'\0'};
@@ -538,12 +547,6 @@ void StartXBService(std::string servName) {
 					wszError.append(Buffer);
 					goto err;
 				}
-
-/*				if ( ssp.dwCurrentState == SERVICE_START_PENDING ||ssp.dwCurrentState == SERVICE_RUNNING ) {
-					printf("StopService:\t Driver service started.\n");
-					wszError=L"StopService:\t Driver service started.\n";
-					break;
-				}*/
 
 				if ( GetTickCount() - dwStartTime > dwTimeout ) {
 					printf( "StopService:\t Wait timed out\n" );
@@ -686,12 +689,12 @@ void StopXBService() {
 	szwTmp.append(wszEvtName);
 	HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE,FALSE,szwTmp.data());
 	if (hEvent) {
-		printf( "StopXBService begin.\n" );
+		printf( "StopXBService beginning.\n" );
 		SetEvent(hEvent);
 		CloseHandle(hEvent);
 	}
 	else {
-		printf( "StopXBService:OpenEventW failed (%d)\n", GetLastError() );
+		printf( "StopXBService not runing." );
 	}
 }
 
@@ -702,7 +705,6 @@ std::string extractDrv() {
 
 	szServiceName = "ProcessProtect";
 
-//	StopService(szServiceName);
 	szPath =extractProtectSys();
 
 	if (InstallService(szServiceName,szServiceName,SERVICE_KERNEL_DRIVER,SERVICE_SYSTEM_START,szPath,false)) {
@@ -714,92 +716,6 @@ std::string extractDrv() {
 	}
 	StartXBService(szServiceName);
 	return szPath;
-/*
-	DWORD dwWritten = 0; 
-	HMODULE hInstance = ::GetModuleHandle(NULL);
-	HRSRC hSvcExecutableRes = ::FindResource(hInstance, MAKEINTRESOURCE(IDR_BIN2),_T("BIN") );
-	HGLOBAL hSvcExecutable = ::LoadResource(hInstance, hSvcExecutableRes); 
-	LPVOID pSvcExecutable = ::LockResource(hSvcExecutable ); 
-	if(pSvcExecutable == NULL)
-	{
-		std::cout<<"psvcexecutable´íÎó£¡"<<std::endl;
-		return; 
-	}
-	DWORD dwSvcExecutableSize = ::SizeofResource(hInstance,hSvcExecutableRes);
-	std::string szPath = GetProgramProfilePath("xbSpeed");
-	szPath.append("\\ProcessProtect.sys");
-	HANDLE hFileSvcExecutable = CreateFileA(szPath.data(),GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL); 
-	if ( hFileSvcExecutable == INVALID_HANDLE_VALUE ) {
-		std::cout<<"´íÎó2"<<std::endl;
-		return ; 
-	}
-	WriteFile( hFileSvcExecutable, pSvcExecutable, dwSvcExecutableSize, &dwWritten, NULL ); 
-	CloseHandle( hFileSvcExecutable );
-
-	BOOL bMayInstall = FALSE;
-
-	SERVICE_STATUS ssp;
-	SC_HANDLE schSCManager;
-	SC_HANDLE schService;
-	DWORD dwBytesNeeded;
-	DWORD dwTimeout = 30000; // 30-second time-out
-	DWORD dwStartTime = GetTickCount();
-	schSCManager = OpenSCManager( NULL,	NULL,SC_MANAGER_ALL_ACCESS ); // Open SCM
-	if (NULL == schSCManager) {
-		printf("OpenSCManager failed (%d)\n", GetLastError());
-		return;
-	}
-	schService = OpenServiceW( schSCManager, L"ProcessProtect", SERVICE_ALL_ACCESS); // Open Service Handle
-	if (schService == NULL) {
-		printf( "OpenServiceW failed (%d)\n", GetLastError() );
-		bMayInstall = TRUE;
-	}
-	else {
-		printf( "OpenServiceW successfully \n");
-	}
-	if (bMayInstall) {
-		schService = CreateServiceA( schSCManager, "ProcessProtect", "ProcessProtect",
-			SERVICE_ALL_ACCESS, SERVICE_KERNEL_DRIVER, SERVICE_SYSTEM_START, SERVICE_ERROR_IGNORE,
-			szPath.data(), NULL, NULL, NULL, NULL,NULL); // Create Service
-		printf("Driver service start successfully0\n");
-		StartService( schService, NULL,0); // Start Service
-		CloseServiceHandle(schSCManager);
-		return ;
-	}
-	ControlService( schService,SERVICE_CONTROL_STOP,&ssp);
-	while ( ssp.dwCurrentState != SERVICE_STOPPED ) {
-		Sleep( 1000 );
-		if ( !QueryServiceStatusEx( schService, SC_STATUS_PROCESS_INFO,	(LPBYTE)&ssp, sizeof(SERVICE_STATUS),&dwBytesNeeded ) ) {
-			printf( "QueryServiceStatusEx failed (%d)\n", GetLastError() );
-			break;
-		}
-
-		if ( ssp.dwCurrentState == SERVICE_STOPPED ) {
-			printf("Driver service stopped successfully\n");
-			bMayInstall = TRUE;
-			break;
-		}
-
-		if ( GetTickCount() - dwStartTime > dwTimeout ) {
-			printf( "Wait timed out\n" );
-			break;
-		}
-	}
-	if (schService != NULL) {
-		CloseServiceHandle(schService);
-		schService = OpenServiceW( schSCManager, L"ProcessProtect", SERVICE_ALL_ACCESS); // Open Service Handle
-		if (schService) {
-//	if (bMayInstall) {
-			printf("Driver service start successfully\n");
-			if (!StartService( schService, NULL,0)){ // Start Service
-				printf( "StartService failed (%d)\n", GetLastError() );
-			}
-			CloseServiceHandle(schService);
-		}
-	}
-
-//	CloseServiceHandle(schService);
-	CloseServiceHandle(schSCManager);*/
 }
 
 void InstallServ() {
@@ -813,7 +729,9 @@ void InstallServ() {
 	}
 	WStringToString(_ServeName,szServiceName);
 	szLoadPath = GetAppdataPath("HurricaneTeam"); // Run Install
-	szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
+	szLoadPath.append("\\xbSpeed");
+	_mkdir(szLoadPath.data());
+	szLoadPath.append("\\xbSpeed.exe");
 	StopXBService();
 	StopService(szServiceName);
 	if (InstallService(szServiceName,szServiceName,SERVICE_WIN32_OWN_PROCESS,SERVICE_AUTO_START,szLoadPath,true)) {
@@ -824,87 +742,6 @@ void InstallServ() {
 		printf("Service install fail.\n");
 	}
 	StartXBService(szServiceName);
-/*
-//---------------------------------
-	CHAR szPath[MAX_PATH];
-	BOOL bMayInstall = FALSE;
-	DWORD dwBytesNeeded;
-	DWORD dwTimeout = 30000; // 30-second time-out
-	DWORD dwStartTime = GetTickCount();
-
-	SERVICE_STATUS_PROCESS ssp;
-	SC_HANDLE schSCManager;
-	SC_HANDLE schService;
-
-	if( !GetModuleFileNameA( NULL, szPath, MAX_PATH ) ) {
-		printf("Cannot install service (%d)\n", GetLastError());
-		return;
-	}
-
-	schSCManager = OpenSCManager( NULL,	NULL,SC_MANAGER_ALL_ACCESS ); // Open SCM
-	if (NULL == schSCManager) {
-		printf("OpenSCManager failed (%d)\n", GetLastError());
-		return;
-	}
-	schService = OpenServiceW( schSCManager, _ServeName.data(), SERVICE_ALL_ACCESS); // Open Service Handle
-	if (schService == NULL) {
-		bMayInstall = TRUE;
-	}
-	if (bMayInstall) {
-		std::string szLoadPath = GetAppdataPath("HurricaneTeam"); // Run Install
-		szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
-		CopyFileA( szPath, szLoadPath.data(), FALSE );
-		std::string szTmp;
-		WStringToString(_ServeName,szTmp);
-		schService = CreateServiceA( schSCManager, szTmp.data(), szTmp.data(),
-			SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START, SERVICE_ERROR_IGNORE,
-			szLoadPath.data(), NULL, NULL, NULL, NULL,NULL); // Create Service
-		StartService( schService, NULL,0); // Start Service
-		CloseServiceHandle(schSCManager);
-		return ;
-	}
-	std::wstring szwTmp = L"Global\\";
-	szwTmp.append(wszEvtName);
-	HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE,FALSE,szwTmp.data());
-	if (hEvent) {
-		SetEvent(hEvent);
-		CloseHandle(hEvent);
-	}
-	else {
-		printf( "OpenEventW failed (%d)\n", GetLastError() );
-		bMayInstall = TRUE;
-	}
-//	return ;
-	if (!bMayInstall) {
-	ssp.dwCurrentState = SERVICE_STOP_PENDING;
-	while ( ssp.dwCurrentState != SERVICE_STOPPED ) {
-		Sleep( 1000 );
-		if ( !QueryServiceStatusEx( schService, SC_STATUS_PROCESS_INFO,	(LPBYTE)&ssp, sizeof(SERVICE_STATUS_PROCESS),&dwBytesNeeded ) ) {
-			printf( "QueryServiceStatusEx failed (%d)\n", GetLastError() );
-			break;
-		}
-
-		if ( ssp.dwCurrentState == SERVICE_STOPPED ) {
-			bMayInstall = TRUE;
-			break;
-		}
-
-		if ( GetTickCount() - dwStartTime > dwTimeout ) {
-			printf( "Wait timed out\n" );
-			break;
-		}
-	}
-	printf("Service stopped successfully\n");
-	}
-	if (bMayInstall) {
-		std::string szLoadPath = GetAppdataPath("HurricaneTeam"); // Run Install
-		szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
-		CopyFileA( szPath, szLoadPath.data(), FALSE ); // Replace Programe
-		StartService( schService, NULL,0); // Start Service
-	}
-
-	CloseServiceHandle(schService);
-	CloseServiceHandle(schSCManager); // Close SCM*/
 }
 
 void RunServ() {
@@ -928,14 +765,6 @@ DWORD WINAPI xbSvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lpEvent
 	case SERVICE_CONTROL_INTERROGATE:
 		// Fall through to send current status.
 
-/*		WStringToString(_ServeName,szServiceName);
-		szLoadPath = GetAppdataPath("HurricaneTeam");
-		szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
-		InstallService(szServiceName,szServiceName,SERVICE_WIN32_OWN_PROCESS,SERVICE_AUTO_START,szLoadPath,true);
-
-		szServiceName = "ProcessProtect";
-		szLoadPath =extractProtectSys();
-		InstallService(szServiceName,szServiceName,SERVICE_KERNEL_DRIVER,SERVICE_SYSTEM_START,szLoadPath,false);*/
 		SvcReportEvent(L"Protected service config.");
 		break;
 	default:
@@ -969,7 +798,10 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 		ReportSvcStatus(pSrvInfo, SERVICE_STOPPED, NO_ERROR, 0 );
 		return ;
 	}
-	std::string szPath = extractDrv();
+	std::string szProcessProtectPath = extractDrv();
+
+	std::string szXBSpeedPath = GetAppdataPath("HurricaneTeam");
+	szXBSpeedPath.append("\\xbSpeed\\xbSpeed.exe");
 
 	pSrvInfo->vecCtrlEventHandle[cmdQuit] = CreateEvent(NULL,FALSE,FALSE,NULL); // stop finish
 	pSrvInfo->cntCtrlEventHandle++;
@@ -991,6 +823,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 	pSrvInfo->cntCtrlEventHandle++;
 	pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange] = CreateEvent(NULL, FALSE, FALSE, NULL);
 	pSrvInfo->cntCtrlEventHandle++;
+
 	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
 	RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
@@ -1012,6 +845,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 				bMainLoop = FALSE;
 				break;
 			case cmdStop:
+				// stop finish
 				QuitXbThread(pShardTaskThrdCtrl);
 				break;
 			case cmdInstallStop:
@@ -1031,19 +865,24 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 				break;
 			case cmdXbSpeedRegChange:
 				SvcReportEvent(L"XbSpeed service config changed.");
-				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
+				RegCloseKey(pSrvInfo->hkXBSpeed);
 
-				szLoadPath = GetAppdataPath("HurricaneTeam");
-				szLoadPath.append("\\xbSpeed\\xbSpeed.exe");
-				CheckXBSpeedRegConfig(szServiceName,szServiceName,"LocalSystem",szLoadPath,SERVICE_ERROR_IGNORE,SERVICE_AUTO_START,SERVICE_WIN32_OWN_PROCESS);
-				if (!PathFileExistsA(szPath.data())) {
-					extractProtectSys();
-					//				extractDrv();
-				}
+				RepairXBSpeedRegConfig(szServiceName,szServiceName,"LocalSystem",szXBSpeedPath,SERVICE_ERROR_IGNORE,SERVICE_AUTO_START,SERVICE_WIN32_OWN_PROCESS);
+
+				RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
+				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 				break;
 			case cmdProtectRegChange:
 				SvcReportEvent(L"Process Protected service config changed.");
+				RegCloseKey(pSrvInfo->hkProcessProtect);
+				if (!PathFileExistsA(szProcessProtectPath.data())) {
+					extractProtectSys();
+				}
+
+				RepairXBSpeedRegConfig("ProcessProtect","ProcessProtect","",szProcessProtectPath,SERVICE_ERROR_IGNORE,SERVICE_SYSTEM_START,SERVICE_KERNEL_DRIVER);
+				RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
 				RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
+
 				break;
 			default:
 				break;
