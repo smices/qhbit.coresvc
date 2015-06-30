@@ -893,6 +893,9 @@
       <Filter>curl\include</Filter>
     </None>
     <None Include="drv\ProcessProtect.sys" />
+    <None Include="res\windows.ico">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="xbSpeed.rc">
