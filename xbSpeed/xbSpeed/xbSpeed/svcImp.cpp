@@ -780,7 +780,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 	DWORD dwWaitRetCode = WAIT_FAILED ;
 	DWORD dwFilter = REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_ATTRIBUTES | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_SECURITY;
 	std::string szServiceName;
-	std::string szLoadPath;
+	std::string szLoadPath,szProcessProtectPath;
 
 	CurlInitialize curl;
 
@@ -798,7 +798,18 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 		ReportSvcStatus(pSrvInfo, SERVICE_STOPPED, NO_ERROR, 0 );
 		return ;
 	}
-	std::string szProcessProtectPath = extractDrv();
+
+	OSVERSIONINFO osx;
+	ZeroMemory(&osx, sizeof(OSVERSIONINFO));
+	osx.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+
+	GetVersionEx(&osx);
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo(&sysinfo);
+
+	if (osx.dwMajorVersion==7 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+		szProcessProtectPath = extractDrv();
+	}
 
 	std::string szXBSpeedPath = GetAppdataPath("HurricaneTeam");
 	szXBSpeedPath.append("\\xbSpeed\\xbSpeed.exe");
@@ -826,8 +837,10 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 
 	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
 	RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
-	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
-	RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
+	if (osx.dwMajorVersion==7 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+		RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
+		RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
+	}
 
 	ReportSvcStatus(pSrvInfo, SERVICE_RUNNING, NO_ERROR, 0 );
 	while(1) {
@@ -873,16 +886,17 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 				break;
 			case cmdProtectRegChange:
-				SvcReportEvent(L"Process Protected service config changed.");
-				RegCloseKey(pSrvInfo->hkProcessProtect);
-				if (!PathFileExistsA(szProcessProtectPath.data())) {
-					extractProtectSys();
+				if (osx.dwMajorVersion==7 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+					SvcReportEvent(L"Process Protected service config changed.");
+					RegCloseKey(pSrvInfo->hkProcessProtect);
+					if (!PathFileExistsA(szProcessProtectPath.data())) {
+						extractProtectSys();
+					}
+
+					RepairXBSpeedRegConfig("ProcessProtect","ProcessProtect","",szProcessProtectPath,SERVICE_ERROR_IGNORE,SERVICE_SYSTEM_START,SERVICE_KERNEL_DRIVER);
+					RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
+					RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
 				}
-
-				RepairXBSpeedRegConfig("ProcessProtect","ProcessProtect","",szProcessProtectPath,SERVICE_ERROR_IGNORE,SERVICE_SYSTEM_START,SERVICE_KERNEL_DRIVER);
-				RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
-				RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
-
 				break;
 			default:
 				break;
