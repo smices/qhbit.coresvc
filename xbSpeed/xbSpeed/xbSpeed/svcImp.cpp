@@ -775,13 +775,16 @@ DWORD WINAPI xbSvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lpEvent
 	return 0;
 }
 
+typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
+
 VOID SvcInit( PSrvInfo pSrvInfo) {
 	BOOL bMainLoop  = TRUE;
 	DWORD dwWaitRetCode = WAIT_FAILED ;
 	DWORD dwFilter = REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_ATTRIBUTES | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_SECURITY;
 	std::string szServiceName;
 	std::string szLoadPath,szProcessProtectPath;
-
+	bool x86 = true;
+	PGNSI pGNSI;
 	CurlInitialize curl;
 
 	WStringToString(_ServeName,szServiceName);
@@ -805,9 +808,16 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 
 	GetVersionEx(&osx);
 	SYSTEM_INFO sysinfo;
-	GetSystemInfo(&sysinfo);
+	/*GetSystemInfo(&sysinfo);*/
+	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")),"GetNativeSystemInfo");
+	if(NULL != pGNSI)
+		pGNSI(&sysinfo);
+	else GetSystemInfo(&sysinfo);
 
-	if (osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+	if (sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
+		x86=false;
+	}
+	if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
 		szProcessProtectPath = extractDrv();
 	}
 
@@ -837,7 +847,8 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 
 	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
 	RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
-	if (osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+
+	if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
 		RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
 		RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
 	}
@@ -886,7 +897,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 				break;
 			case cmdProtectRegChange:
-				if (osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+				if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
 					SvcReportEvent(L"Process Protected service config changed.");
 					RegCloseKey(pSrvInfo->hkProcessProtect);
 					if (!PathFileExistsA(szProcessProtectPath.data())) {
