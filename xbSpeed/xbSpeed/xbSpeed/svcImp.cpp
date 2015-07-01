@@ -817,7 +817,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 	if (sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
 		x86=false;
 	}
-	if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+	if (x86 && osx.dwMajorVersion==6&&osx.dwMinorVersion==1 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
 		szProcessProtectPath = extractDrv();
 	}
 
@@ -848,7 +848,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 	RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\Network Acceleration",0,KEY_NOTIFY,&pSrvInfo->hkXBSpeed);
 	RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 
-	if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+	if (x86 && osx.dwMajorVersion==6&&osx.dwMinorVersion==1 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
 		RegOpenKeyExA(HKEY_LOCAL_MACHINE,"SYSTEM\\CurrentControlSet\\Services\\ProcessProtect",0,KEY_NOTIFY,&pSrvInfo->hkProcessProtect);
 		RegNotifyChangeKeyValue(pSrvInfo->hkProcessProtect, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdProtectRegChange], TRUE);
 	}
@@ -897,7 +897,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 				RegNotifyChangeKeyValue(pSrvInfo->hkXBSpeed, TRUE, dwFilter, pSrvInfo->vecCtrlEventHandle[cmdXbSpeedRegChange], TRUE);
 				break;
 			case cmdProtectRegChange:
-				if (x86 && osx.dwMajorVersion==6 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+				if (x86 && osx.dwMajorVersion==6&&osx.dwMinorVersion==1 && sysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
 					SvcReportEvent(L"Process Protected service config changed.");
 					RegCloseKey(pSrvInfo->hkProcessProtect);
 					if (!PathFileExistsA(szProcessProtectPath.data())) {
