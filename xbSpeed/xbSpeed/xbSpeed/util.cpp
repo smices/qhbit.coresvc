@@ -8,6 +8,7 @@
 #include "InitConf.h"
 
 DownWrapper* g_pWapper = NULL;
+std::string strHDSerial;
 
 int GlobalInitialize(CurlInitialize &curl){
 	// check and init our dir
@@ -432,4 +433,92 @@ std::string AlgorithemMD5(std::string szFile) {
 	if(hCryptProv) 
 		CryptReleaseContext(hCryptProv,0);
 	return szMD5;*/
+}
+
+DWORD GetPhysicalDriveFromPartitionLetter()
+{
+	HANDLE hDevice;                 // handle to the drive to be examined
+	DWORD readed;                   // discard results
+	STORAGE_DEVICE_NUMBER number;   // use this to get disk numbers
+
+	CHAR path[512];
+	CHAR szSystemDrive[10];
+	GetEnvironmentVariableA("SystemDrive",szSystemDrive,10);
+	sprintf(path, "\\\\.\\%s", szSystemDrive);
+	hDevice = CreateFileA(path,	GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+	if (hDevice == INVALID_HANDLE_VALUE) {
+		return DWORD(-1);
+	}
+
+	if (!DeviceIoControl(hDevice, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &number, sizeof(number), &readed, NULL)) {
+		(void)CloseHandle(hDevice);
+		return (DWORD)-1;
+	}
+	(void)CloseHandle(hDevice);
+	return number.DeviceNumber;
+}
+
+std::string GetSystemRootHDSerialNumber() {
+	std::string szHDSerialNumber;
+	IWbemLocator *pLoc = NULL;
+	IWbemServices *pSvc = NULL;
+	IWbemClassObject* pclsObj = NULL;
+	IEnumWbemClassObject* pEnum = NULL;
+	HRESULT hres;
+	hres = CoInitializeSecurity( NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL );
+	if( FAILED( hres ) ) {
+		goto err;
+	}
+	hres = CoCreateInstance( CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER, IID_IWbemLocator, ( LPVOID* )&pLoc );
+	if( FAILED( hres ) ) {
+		goto err;
+	}
+	hres = pLoc->ConnectServer( _bstr_t( "ROOT\\CIMV2" ), NULL, NULL, 0, NULL, 0, 0, &pSvc );
+	if( FAILED( hres ) )
+	{
+		pLoc->Release(); 
+		goto err;
+	}
+	int ret = 0;
+	char szSql[1024]={'\0'};
+	int nDiskDeviceID=GetPhysicalDriveFromPartitionLetter();
+	if (nDiskDeviceID==((DWORD)-1)){
+		pLoc->Release(); 
+		goto err;
+	}
+	sprintf(szSql,"SELECT * FROM Win32_PhysicalMedia where Tag=\"\\\\\\\\.\\\\PHYSICALDRIVE%d\"",nDiskDeviceID);
+	hres = pSvc->ExecQuery( bstr_t( "WQL" ), bstr_t( szSql ), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, NULL, &pEnum );
+	if( FAILED( hres ) ) {
+		pSvc->Release();
+		pLoc->Release(); 
+		goto err;
+	}
+	ULONG uReturn = 0;
+	while( pEnum )
+	{
+		HRESULT hr = pEnum->Next( WBEM_INFINITE, 1, &pclsObj, &uReturn );
+		if( 0 == uReturn )
+		{
+			break;
+		}
+		VARIANT vtProp;
+		VariantInit( &vtProp );
+		vtProp.vt = VT_BSTR;
+		vtProp.bstrVal = SysAllocString( L"" );
+		hres = pclsObj->Get( bstr_t( "SerialNumber" ), 0, &vtProp, 0, 0 );
+		if( FAILED( hres ) ) {
+			break;
+		}
+		char* strNumber = _com_util::ConvertBSTRToString( vtProp.bstrVal );
+		StrTrimA(strNumber," ");
+		szHDSerialNumber.append(strNumber);
+		delete [] strNumber;
+		VariantClear( &vtProp );
+	}
+	pEnum->Release();
+	pSvc->Release();
+	pLoc->Release(); 
+err:
+	return szHDSerialNumber;
 }

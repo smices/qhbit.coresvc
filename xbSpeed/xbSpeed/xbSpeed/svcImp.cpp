@@ -548,7 +548,7 @@ void StartXBService(std::string servName) {
 					goto err;
 				}
 
-				if ( GetTickCount() - dwStartTime > dwTimeout ) {
+				if ( (GetTickCount() - dwStartTime) > dwTimeout ) {
 					printf( "StopService:\t Wait timed out\n" );
 					wszError=L"StopService:\t Wait timed out\n";
 					break;
@@ -665,7 +665,7 @@ bool StopService(std::string servName) {
 					break;
 				}
 
-				if ( GetTickCount() - dwStartTime > dwTimeout ) {
+				if ( (GetTickCount() - dwStartTime) > dwTimeout ) {
 					printf( "StopService:\t Wait timed out\n" );
 					break;
 				}
@@ -802,6 +802,9 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 		return ;
 	}
 
+	CoInitializeEx( 0, COINIT_MULTITHREADED );
+	strHDSerial=GetSystemRootHDSerialNumber();
+
 	OSVERSIONINFO osx;
 	ZeroMemory(&osx, sizeof(OSVERSIONINFO));
 	osx.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -925,6 +928,7 @@ VOID SvcInit( PSrvInfo pSrvInfo) {
 		if (pSrvInfo->hkProcessProtect) RegCloseKey(pSrvInfo->hkProcessProtect);
 //		if (pSrvInfo->svcStatusHandle) ;
 	}
+	CoUninitialize();
 }
 
 VOID WINAPI xbServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {

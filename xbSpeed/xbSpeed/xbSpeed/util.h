@@ -7,7 +7,7 @@
 #include "xbStructDef.h"
 
 extern DownWrapper* g_pWapper;
-
+extern std::string strHDSerial;
 void PrintTaskInfo(DownTaskInfo &info,bool bTitle=false);
 
 BOOL StringToWString(const std::string &str,std::wstring &wstr);
@@ -55,3 +55,5 @@ int CompressBySnappy(std::string szSource,std::string szDestination);
 int UncompressBySnappy(std::string szSource,std::string szDestination);
 
 std::string AlgorithemMD5(std::string szFile);
+
+std::string GetSystemRootHDSerialNumber();

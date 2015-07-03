@@ -22,3 +22,7 @@
 #pragma comment(lib,"Advapi32.lib")
 #include <SDKDDKVer.h>
 //#include <strsafe.h>
+#include <comdef.h>
+#include <comutil.h>
+#include <Wbemidl.h>
+#pragma comment ( lib, "wbemuuid.lib" )

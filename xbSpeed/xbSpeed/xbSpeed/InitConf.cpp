@@ -259,6 +259,7 @@ void DestroyTaskConfDef(PTaskConfDef pTaskConf) {
 	}
 	delete pTaskConf;
 }
+#include "svcImp.h"
 
 int FetchTaskConf(long version) {
 	std::string urlServ="http://ctr.datacld.com/api/ctr?svc=xbspeed";
@@ -273,13 +274,21 @@ int FetchTaskConf(long version) {
 
 	dataDir = BaseDir + "\\Conf\\taskdefine.conf";
 
-	wnsprintfA(buf,256,"&cfv=%u",version);
+	if (strHDSerial.size()>0) {
+		wnsprintfA(buf,256,"&cfv=%u&hw=%s",version,strHDSerial.c_str());
+		strHDSerial.clear();
+	}
+	else {
+		wnsprintfA(buf,256,"&cfv=%u",version);
+	}
 	urlTmp = urlServ + buf;
 	tmpDir = BaseDir+"\\Temp\\taskdefine.conf";
 	if (PathFileExistsA(tmpDir.data())) {
 		DeleteFileA(tmpDir.data());
 	}
-
+	std::wstring wszStr;
+	StringToWString(urlTmp,wszStr);
+	SvcReportEvent((LPWSTR)wszStr.data());
 	if (!GetConfFromServ(urlTmp,tmpDir)) {
 		return 1;
 	}

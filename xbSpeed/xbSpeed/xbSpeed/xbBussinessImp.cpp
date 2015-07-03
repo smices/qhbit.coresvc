@@ -255,6 +255,8 @@ void DetectNewUpgrade (mapCurUpgradeTask &mapUpgradeStatus,int status,long &vers
 	DestroyUpdateConfDef(upgradeConfNew);
 }
 
+#include "svcImp.h"
+
 DWORD TaskThreadProc(PThreadCtrl pThrdCtrl) {
 	bool bUpdateConf = false,bUpgradeConf=false;
 	DWORD dwTickCountCur = 0, dwTickCountLast= 0;
@@ -321,9 +323,12 @@ DWORD TaskThreadProc(PThreadCtrl pThrdCtrl) {
 		}
 		else if (waitRet==WAIT_TIMEOUT) {
 			////check server task conf updated?
-			//check server define task conf period 3600s
-			dwTickCountCur = GetTickCount();
-			if(dwTickCountCur-dwTickCountLast>10*1000) {				
+			//check server define task conf period 14400s = 4 hours
+			dwTickCountCur = time(NULL);//GetTickCount();
+//			wchar_t buf[256]={0};
+//			wsprintfW(buf,L"dwTickCountLast=%d,dwTickCountCur=%d",dwTickCountLast,dwTickCountCur);
+//			SvcReportEvent((LPWSTR)buf);
+			if((dwTickCountCur-dwTickCountLast)>14400) {				
 				if (FetchTaskConf(shareVersion)==0) {
 					bUpdateConf = true;//have new config
 				}
