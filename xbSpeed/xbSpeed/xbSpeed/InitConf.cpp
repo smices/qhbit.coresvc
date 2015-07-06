@@ -338,8 +338,8 @@ std::string ScanTarget(PTaskItem pItem) {
 		// scan all disk root
 		{
 			itPath = szPath;
-			itPath.append(pItem->storage);
-			itPath.append("\\");
+//			itPath.append(pItem->storage);
+//			itPath.append("\\");
 			itPath.append(pItem->name);
 			itPathTD = itPath;
 			itPathTD.append(".td");
@@ -364,8 +364,8 @@ std::string ScanTarget(PTaskItem pItem) {
 
 				{
 					secdPath = itPath;
-					secdPath.append(pItem->storage);
-					secdPath.append("\\");
+//					secdPath.append(pItem->storage);
+//					secdPath.append("\\");
 					secdPath.append(pItem->name);
 					itPathTD = secdPath;
 					itPathTD.append(".td");
