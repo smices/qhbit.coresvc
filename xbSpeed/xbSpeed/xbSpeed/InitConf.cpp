@@ -91,12 +91,15 @@ BOOL GetResourceFromHttp(const char *urls,const char *filename)
 	FILE* __fpw=fopen(filename, "wb");
 	if(!__fpw)
 		return FALSE;
-
+	std::string szCookieFile = GetProgramProfilePath("xbSpeed");
+	szCookieFile.append("\\xbspeed.cookie");
 	char url[1024];
 	_snprintf_s(url, sizeof(url), "%s",urls);
 
 	CURL* curl = curl_easy_init();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_COOKIEFILE,szCookieFile.data());
+	curl_easy_setopt(curl, CURLOPT_COOKIEJAR,szCookieFile.data());
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, __fpw);
 
